@@ -1,0 +1,2360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARINC 429 Encoder / Decoder</title>
+
+<style>
+:root {
+    --blue:#0078d4;
+    --blue-dark:#005a9e;
+    --green:#107c10;
+    --red:#d13438;
+    --border:#d2d2d2;
+    --light:#f5f7f9;
+    --text:#242424;
+    --muted:#666;
+}
+
+* { box-sizing:border-box; }
+
+body {
+    margin:0;
+    font-family:"Segoe UI",Arial,sans-serif;
+    background:#eef2f6;
+    color:var(--text);
+}
+
+header {
+    background:#17283a;
+    color:white;
+    padding:20px 32px;
+}
+
+header h1 {
+    margin:0;
+    font-size:24px;
+}
+
+header p {
+    margin:5px 0 0;
+    color:#cbd5df;
+}
+
+main {
+    max-width:1400px;
+    margin:22px auto;
+    padding:0 20px 40px;
+}
+
+.card {
+    background:white;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:20px;
+    margin-bottom:18px;
+}
+
+.card h2 {
+    margin:0 0 16px;
+    font-size:18px;
+}
+
+.grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    gap:14px;
+}
+
+.field label {
+    display:block;
+    font-size:13px;
+    font-weight:600;
+    margin-bottom:5px;
+}
+
+.sub {
+    font-size:11px;
+    color:#777;
+    margin-top:4px;
+}
+
+input,select,button {
+    width:100%;
+    padding:9px 10px;
+    border-radius:5px;
+    border:1px solid #aaa;
+    font-size:14px;
+}
+
+input:focus,select:focus {
+    outline:2px solid rgba(0,120,212,.25);
+    border-color:var(--blue);
+}
+
+button {
+    background:var(--blue);
+    color:white;
+    border:0;
+    cursor:pointer;
+    font-weight:600;
+}
+
+button:hover {
+    background:var(--blue-dark);
+}
+
+.mode-buttons,
+.tabs {
+    display:flex;
+    gap:8px;
+    margin-bottom:18px;
+    flex-wrap:wrap;
+}
+
+.mode-button,
+.tab {
+    width:auto;
+    padding:9px 18px;
+    background:#ddd;
+    color:#222;
+}
+
+.mode-button.active,
+.tab.active {
+    background:var(--blue);
+    color:white;
+}
+
+.input-mode,
+.panel {
+    display:none;
+}
+
+.input-mode.active,
+.panel.active {
+    display:block;
+}
+
+.word-row {
+    display:grid;
+    grid-template-columns:1fr 180px;
+    gap:12px;
+}
+
+.word-input {
+    font-family:Consolas,monospace;
+    font-size:22px;
+    letter-spacing:1px;
+}
+
+.summary {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(145px,1fr));
+    gap:10px;
+}
+
+.summary-box {
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:12px;
+    background:var(--light);
+}
+
+.summary-box .name {
+    font-size:12px;
+    color:var(--muted);
+}
+
+.summary-box .value {
+    font-family:Consolas,monospace;
+    font-size:18px;
+    margin-top:4px;
+    font-weight:600;
+}
+
+.generated {
+    border:2px solid var(--blue);
+    background:#f5fbff;
+}
+
+.generated .value {
+    font-size:23px;
+    color:var(--blue-dark);
+}
+
+/* WORD MAP */
+
+.bit-container {
+    overflow-x:auto;
+}
+
+.field-header {
+    min-width:1150px;
+    display:grid;
+    grid-template-columns:1fr 2fr 19fr 2fr 8fr;
+    gap:2px;
+    margin-bottom:4px;
+}
+
+.field-header div {
+    text-align:center;
+    padding:5px 2px;
+    font-size:11px;
+    font-weight:700;
+    border-radius:3px;
+}
+
+.header-parity { background:#fde7e9; }
+.header-ssm    { background:#fff4ce; }
+.header-data   { background:#e8f3ff; }
+.header-sdi    { background:#e9f7e9; }
+.header-label  { background:#f2e9ff; }
+
+.bits {
+    min-width:1150px;
+    display:grid;
+    grid-template-columns:repeat(32,1fr);
+    gap:2px;
+}
+
+.bit {
+    border:1px solid #aaa;
+    text-align:center;
+    padding:7px 1px;
+    font-family:Consolas,monospace;
+    cursor:pointer;
+    user-select:none;
+    transition:
+        transform .08s ease,
+        box-shadow .08s ease,
+        filter .08s ease;
+}
+
+.bit:hover {
+    transform:translateY(-2px);
+    box-shadow:0 3px 7px rgba(0,0,0,.20);
+    filter:brightness(.96);
+}
+
+.bit:active {
+    transform:translateY(0);
+    box-shadow:inset 0 0 4px rgba(0,0,0,.25);
+}
+
+.bit-number {
+    font-size:10px;
+    color:#555;
+    pointer-events:none;
+}
+
+.bit-value {
+    font-size:18px;
+    font-weight:bold;
+    pointer-events:none;
+}
+
+.parity { background:#fde7e9; }
+.ssm    { background:#fff4ce; }
+.data   { background:#e8f3ff; }
+.sdi    { background:#e9f7e9; }
+.label  { background:#f2e9ff; }
+
+.bit.is-one {
+    outline:2px solid rgba(0,0,0,.45);
+    outline-offset:-3px;
+}
+
+.legend {
+    display:flex;
+    flex-wrap:wrap;
+    gap:14px;
+    margin-top:12px;
+    font-size:12px;
+}
+
+.legend span::before {
+    content:"";
+    display:inline-block;
+    width:13px;
+    height:13px;
+    margin-right:5px;
+    vertical-align:-2px;
+    border:1px solid #aaa;
+}
+
+.legend-parity::before { background:#fde7e9; }
+.legend-ssm::before    { background:#fff4ce; }
+.legend-data::before   { background:#e8f3ff; }
+.legend-sdi::before    { background:#e9f7e9; }
+.legend-label::before  { background:#f2e9ff; }
+
+table {
+    width:100%;
+    border-collapse:collapse;
+}
+
+th,td {
+    text-align:left;
+    padding:9px;
+    border-bottom:1px solid #ddd;
+}
+
+th {
+    background:var(--light);
+    font-size:13px;
+}
+
+.mono {
+    font-family:Consolas,monospace;
+}
+
+.result-large {
+    font-size:26px;
+    font-weight:700;
+    color:var(--blue-dark);
+}
+
+.note {
+    color:#666;
+    font-size:12px;
+    margin-top:8px;
+}
+
+.good {
+    color:var(--green);
+    font-weight:600;
+}
+
+.bad {
+    color:var(--red);
+    font-weight:600;
+}
+
+.error {
+    background:#fde7e9;
+    border:1px solid #d13438;
+    color:#a4262c;
+    padding:10px;
+    border-radius:5px;
+    margin-top:10px;
+    display:none;
+}
+
+.discrete-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(90px,1fr));
+    gap:7px;
+}
+
+.discrete {
+    border:1px solid #ccc;
+    border-radius:5px;
+    text-align:center;
+    padding:7px;
+}
+
+.discrete.on {
+    background:#dff6dd;
+    border-color:#7fba73;
+}
+
+.discrete.off {
+    background:#f5f5f5;
+}
+
+footer {
+    color:#666;
+    text-align:center;
+    font-size:12px;
+    padding:10px;
+}
+
+@media(max-width:700px) {
+    .word-row {
+        grid-template-columns:1fr;
+    }
+
+    .mode-buttons {
+        flex-direction:column;
+    }
+
+    .mode-button {
+        width:100%;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+<h1>ARINC 429 Encoder / Decoder</h1>
+<p>Decode, construct, and manually edit 32-bit ARINC 429 words</p>
+</header>
+
+<main>
+
+<!-- ======================================================
+     INPUT
+====================================================== -->
+
+<div class="card">
+
+<h2>Input</h2>
+
+<div class="mode-buttons">
+
+<button
+    id="completeModeButton"
+    class="mode-button active"
+    onclick="setInputMode('complete')">
+Complete 32-Bit Word
+</button>
+
+<button
+    id="fieldsModeButton"
+    class="mode-button"
+    onclick="setInputMode('fields')">
+Individual Fields
+</button>
+
+</div>
+
+
+<!-- COMPLETE WORD -->
+
+<div id="completeMode" class="input-mode active">
+
+<div class="word-row">
+
+<input
+    id="wordInput"
+    class="word-input"
+    value="E13880C1"
+    placeholder="Example: E13880C1">
+
+<button onclick="decodeFullWord()">
+Decode Word
+</button>
+
+</div>
+
+<div class="grid" style="margin-top:14px;">
+
+<div class="field">
+
+<label>Input Format</label>
+
+<select id="inputFormat">
+<option value="hex">Hexadecimal</option>
+<option value="binary">Binary</option>
+</select>
+
+</div>
+
+<div class="field">
+
+<label>Label Representation</label>
+
+<select id="labelMode">
+<option value="bus">
+As transmitted on ARINC bus
+</option>
+
+<option value="reversed">
+Label already reversed by interface
+</option>
+</select>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- INDIVIDUAL FIELDS -->
+
+<div id="fieldsMode" class="input-mode">
+
+<div class="grid">
+
+<div class="field">
+<label>Label</label>
+<input id="fieldLabel" value="203" maxlength="3">
+<div class="sub">Octal, 000–377</div>
+</div>
+
+<div class="field">
+<label>SDI</label>
+<input id="fieldSDI" value="00" maxlength="2">
+<div class="sub">Binary, 00–11</div>
+</div>
+
+<div class="field">
+<label>Data</label>
+<input id="fieldData" value="04E20">
+<div class="sub">19-bit data field, hexadecimal</div>
+</div>
+
+<div class="field">
+<label>SSM</label>
+<input id="fieldSSM" value="11" maxlength="2">
+<div class="sub">Binary, 00–11</div>
+</div>
+
+<div class="field">
+
+<label>Parity</label>
+
+<select id="fieldParity">
+<option value="auto">Auto Odd Parity</option>
+<option value="0">0</option>
+<option value="1">1</option>
+</select>
+
+<div class="sub">
+Bit 32
+</div>
+
+</div>
+
+</div>
+
+<button
+    style="margin-top:14px;max-width:230px;"
+    onclick="buildWord()">
+Build ARINC Word
+</button>
+
+</div>
+
+<div id="error" class="error"></div>
+
+</div>
+
+
+<!-- ======================================================
+     COMPLETE GENERATED WORD
+====================================================== -->
+
+<div class="card">
+
+<h2>ARINC Word</h2>
+
+<div class="summary">
+
+<div class="summary-box generated">
+<div class="name">Hexadecimal</div>
+<div class="value" id="hexWord">--</div>
+</div>
+
+<div class="summary-box generated">
+
+<div class="name">Binary, Bit 32 → Bit 1</div>
+
+<div
+    class="value"
+    id="binaryWord"
+    style="font-size:13px;word-break:break-all;">
+--
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ======================================================
+     DECODED FIELDS
+====================================================== -->
+
+<div class="card">
+
+<h2>Decoded Fields</h2>
+
+<div class="summary">
+
+<div class="summary-box">
+<div class="name">Label</div>
+<div class="value" id="labelOutput">--</div>
+</div>
+
+<div class="summary-box">
+<div class="name">Label Hex</div>
+<div class="value" id="labelHex">--</div>
+</div>
+
+<div class="summary-box">
+<div class="name">SDI</div>
+<div class="value" id="sdiOutput">--</div>
+</div>
+
+<div class="summary-box">
+<div class="name">Data 11–29</div>
+<div class="value" id="dataOutput">--</div>
+</div>
+
+<div class="summary-box">
+<div class="name">SSM</div>
+<div class="value" id="ssmOutput">--</div>
+</div>
+
+<div class="summary-box">
+<div class="name">Parity Bit</div>
+<div class="value" id="parityBitOutput">--</div>
+</div>
+
+<div class="summary-box">
+<div class="name">Parity Check</div>
+<div class="value" id="parityOutput">--</div>
+</div>
+
+</div>
+
+</div>
+
+
+<!-- ======================================================
+     CLICKABLE WORD MAP
+====================================================== -->
+
+<div class="card">
+
+<h2>Interactive 32-Bit Word Map</h2>
+
+<p class="note">
+Click any bit to toggle it between 0 and 1. All decoded fields
+and data interpretations update immediately.
+</p>
+
+<div class="bit-container">
+
+<div class="field-header">
+<div class="header-parity">PARITY</div>
+<div class="header-ssm">SSM</div>
+<div class="header-data">DATA</div>
+<div class="header-sdi">SDI</div>
+<div class="header-label">LABEL</div>
+</div>
+
+<div id="bits" class="bits"></div>
+
+</div>
+
+<div class="legend">
+
+<span class="legend-parity">Parity - Bit 32</span>
+<span class="legend-ssm">SSM - Bits 31–30</span>
+<span class="legend-data">Data - Bits 29–11</span>
+<span class="legend-sdi">SDI - Bits 10–9</span>
+<span class="legend-label">Label - Bits 8–1</span>
+
+</div>
+
+</div>
+
+
+<!-- ======================================================
+     DATA DECODER
+====================================================== -->
+
+<div class="card">
+
+<h2>Data Decoder</h2>
+
+<div class="tabs">
+
+<button
+    class="tab active"
+    onclick="setTab('bnr',this)">
+BNR
+</button>
+
+<button
+    class="tab"
+    onclick="setTab('bcd',this)">
+BCD
+</button>
+
+<button
+    class="tab"
+    onclick="setTab('discrete',this)">
+Discrete
+</button>
+
+<button
+    class="tab"
+    onclick="setTab('raw',this)">
+Raw Bits
+</button>
+
+</div>
+
+
+<!-- BNR -->
+
+<div id="bnr" class="panel active">
+
+<div class="grid">
+
+<div class="field">
+<label>Data MSB</label>
+<input
+    id="bnrMSB"
+    type="number"
+    min="11"
+    max="29"
+    value="29">
+</div>
+
+<div class="field">
+<label>Data LSB</label>
+<input
+    id="bnrLSB"
+    type="number"
+    min="11"
+    max="29"
+    value="11">
+</div>
+
+<div class="field">
+
+<label>Signed</label>
+
+<select id="bnrSigned">
+<option value="yes">Yes</option>
+<option value="no">No</option>
+</select>
+
+</div>
+
+<div class="field">
+
+<label>LSB Resolution</label>
+
+<input
+    id="bnrResolution"
+    type="number"
+    step="any"
+    value="1">
+
+</div>
+
+<div class="field">
+
+<label>Engineering Offset</label>
+
+<input
+    id="bnrOffset"
+    type="number"
+    step="any"
+    value="0">
+
+</div>
+
+<div class="field">
+
+<label>Units</label>
+
+<input
+    id="bnrUnits"
+    placeholder="ft, kt, deg, psi...">
+
+</div>
+
+</div>
+
+<button
+    style="margin-top:14px;max-width:220px;"
+    onclick="decodeBNR()">
+Decode BNR
+</button>
+
+<div style="margin-top:18px">
+
+<div class="note">
+Engineering Value
+</div>
+
+<div
+    id="bnrResult"
+    class="result-large">
+--
+</div>
+
+</div>
+
+<table style="margin-top:15px;">
+
+<tr>
+<th>Raw Integer</th>
+<td id="bnrRaw">--</td>
+</tr>
+
+<tr>
+<th>Bit Range</th>
+<td id="bnrBits">--</td>
+</tr>
+
+<tr>
+<th>Binary</th>
+<td
+    id="bnrBinary"
+    class="mono">
+--
+</td>
+</tr>
+
+</table>
+
+</div>
+
+
+<!-- BCD -->
+
+<div id="bcd" class="panel">
+
+<p>
+Standard ARINC 429 BCD digit interpretation.
+</p>
+
+<button
+    style="max-width:220px;"
+    onclick="decodeBCD()">
+Decode BCD
+</button>
+
+<div style="margin-top:18px">
+
+<div class="note">
+BCD Value
+</div>
+
+<div
+    id="bcdResult"
+    class="result-large">
+--
+</div>
+
+</div>
+
+<table style="margin-top:15px;">
+
+<thead>
+<tr>
+<th>Digit</th>
+<th>Bits</th>
+<th>Binary</th>
+<th>Decimal</th>
+</tr>
+</thead>
+
+<tbody id="bcdTable"></tbody>
+
+</table>
+
+</div>
+
+
+<!-- DISCRETES -->
+
+<div id="discrete" class="panel">
+
+<p>
+Individual state of ARINC 429 data bits 11 through 29.
+</p>
+
+<div
+    id="discreteGrid"
+    class="discrete-grid">
+</div>
+
+</div>
+
+
+<!-- RAW -->
+
+<div id="raw" class="panel">
+
+<div class="grid">
+
+<div class="field">
+
+<label>MSB</label>
+
+<input
+    id="rawMSB"
+    type="number"
+    min="1"
+    max="32"
+    value="29">
+
+</div>
+
+<div class="field">
+
+<label>LSB</label>
+
+<input
+    id="rawLSB"
+    type="number"
+    min="1"
+    max="32"
+    value="11">
+
+</div>
+
+</div>
+
+<button
+    style="margin-top:14px;max-width:220px;"
+    onclick="decodeRaw()">
+Extract Bits
+</button>
+
+<table style="margin-top:15px;">
+
+<tr>
+<th>Binary</th>
+<td
+    id="rawBinary"
+    class="mono">
+--
+</td>
+</tr>
+
+<tr>
+<th>Hex</th>
+<td
+    id="rawHex"
+    class="mono">
+--
+</td>
+</tr>
+
+<tr>
+<th>Unsigned Decimal</th>
+<td id="rawDecimal">--</td>
+</tr>
+
+</table>
+
+</div>
+
+</div>
+
+
+<!-- ======================================================
+     SSM REFERENCE
+====================================================== -->
+
+<div class="card">
+
+<h2>SSM Reference</h2>
+
+<table>
+
+<thead>
+<tr>
+<th>SSM</th>
+<th>BNR</th>
+<th>Discrete</th>
+</tr>
+</thead>
+
+<tbody>
+
+<tr>
+<td class="mono">00</td>
+<td>Failure Warning</td>
+<td>Verified Data / Normal</td>
+</tr>
+
+<tr>
+<td class="mono">01</td>
+<td>No Computed Data</td>
+<td>No Computed Data</td>
+</tr>
+
+<tr>
+<td class="mono">10</td>
+<td>Functional Test</td>
+<td>Functional Test</td>
+</tr>
+
+<tr>
+<td class="mono">11</td>
+<td>Normal Operation</td>
+<td>Failure Warning</td>
+</tr>
+
+</tbody>
+
+</table>
+
+</div>
+
+</main>
+
+<footer>
+ARINC 429 Engineering Encoder / Decoder
+</footer>
+
+
+<script>
+
+let currentWord = 0;
+
+
+/* =========================================================
+   BIT FUNCTIONS
+========================================================= */
+
+function reverse8(x) {
+
+    let r = 0;
+
+    for(let i = 0; i < 8; i++) {
+
+        r =
+            (r << 1) |
+            ((x >> i) & 1);
+    }
+
+    return r;
+}
+
+
+function getBit(bitNumber) {
+
+    return (
+        currentWord >>>
+        (bitNumber - 1)
+    ) & 1;
+}
+
+
+function extractBits(msb, lsb) {
+
+    let value = 0;
+
+    for(let bit = lsb; bit <= msb; bit++) {
+
+        const b = getBit(bit);
+
+        value +=
+            b *
+            Math.pow(
+                2,
+                bit - lsb
+            );
+    }
+
+    return value;
+}
+
+
+function binaryRange(msb, lsb) {
+
+    let output = "";
+
+    for(let bit = msb; bit >= lsb; bit--) {
+
+        output += getBit(bit);
+    }
+
+    return output;
+}
+
+
+/* =========================================================
+   INPUT MODE
+========================================================= */
+
+function setInputMode(mode) {
+
+    document
+        .querySelectorAll(".input-mode")
+        .forEach(
+            x => x.classList.remove("active")
+        );
+
+    document
+        .querySelectorAll(".mode-button")
+        .forEach(
+            x => x.classList.remove("active")
+        );
+
+
+    if(mode === "complete") {
+
+        document
+            .getElementById("completeMode")
+            .classList.add("active");
+
+        document
+            .getElementById("completeModeButton")
+            .classList.add("active");
+
+    } else {
+
+        document
+            .getElementById("fieldsMode")
+            .classList.add("active");
+
+        document
+            .getElementById("fieldsModeButton")
+            .classList.add("active");
+    }
+}
+
+
+/* =========================================================
+   COMPLETE WORD INPUT
+========================================================= */
+
+function decodeFullWord() {
+
+    hideError();
+
+    let input =
+        document
+            .getElementById("wordInput")
+            .value
+            .trim()
+            .replace(/\s/g,"")
+            .replace(/_/g,"");
+
+
+    const format =
+        document
+            .getElementById("inputFormat")
+            .value;
+
+
+    if(format === "hex") {
+
+        input =
+            input.replace(/^0x/i,"");
+
+        if(
+            !/^[0-9a-fA-F]{1,8}$/
+            .test(input)
+        ) {
+
+            showError(
+                "Enter up to eight hexadecimal digits."
+            );
+
+            return;
+        }
+
+
+        currentWord =
+            parseInt(input,16) >>> 0;
+
+    } else {
+
+        input =
+            input.replace(/^0b/i,"");
+
+        if(
+            !/^[01]{1,32}$/
+            .test(input)
+        ) {
+
+            showError(
+                "Enter up to 32 binary digits."
+            );
+
+            return;
+        }
+
+
+        currentWord =
+            parseInt(input,2) >>> 0;
+    }
+
+
+    updateDisplay();
+}
+
+
+/* =========================================================
+   BUILD WORD FROM FIELDS
+========================================================= */
+
+function buildWord() {
+
+    hideError();
+
+
+    const labelText =
+        document
+            .getElementById("fieldLabel")
+            .value
+            .trim();
+
+
+    const sdiText =
+        document
+            .getElementById("fieldSDI")
+            .value
+            .trim();
+
+
+    let dataText =
+        document
+            .getElementById("fieldData")
+            .value
+            .trim()
+            .replace(/^0x/i,"");
+
+
+    const ssmText =
+        document
+            .getElementById("fieldSSM")
+            .value
+            .trim();
+
+
+    const paritySetting =
+        document
+            .getElementById("fieldParity")
+            .value;
+
+
+    /* LABEL */
+
+    if(
+        !/^[0-7]{1,3}$/
+        .test(labelText)
+    ) {
+
+        showError(
+            "Label must be octal, from 000 through 377."
+        );
+
+        return;
+    }
+
+
+    const label =
+        parseInt(labelText,8);
+
+
+    if(label > 255) {
+
+        showError(
+            "Label must be between 000 and 377 octal."
+        );
+
+        return;
+    }
+
+
+    /* SDI */
+
+    if(
+        !/^[01]{2}$/
+        .test(sdiText)
+    ) {
+
+        showError(
+            "SDI must be 00, 01, 10, or 11."
+        );
+
+        return;
+    }
+
+
+    const sdi =
+        parseInt(sdiText,2);
+
+
+    /* DATA */
+
+    if(
+        !/^[0-9a-fA-F]{1,5}$/
+        .test(dataText)
+    ) {
+
+        showError(
+            "Data must be a hexadecimal value representing bits 11 through 29."
+        );
+
+        return;
+    }
+
+
+    const data =
+        parseInt(dataText,16);
+
+
+    if(data > 0x7FFFF) {
+
+        showError(
+            "The 19-bit ARINC data field cannot exceed 0x7FFFF."
+        );
+
+        return;
+    }
+
+
+    /* SSM */
+
+    if(
+        !/^[01]{2}$/
+        .test(ssmText)
+    ) {
+
+        showError(
+            "SSM must be 00, 01, 10, or 11."
+        );
+
+        return;
+    }
+
+
+    const ssm =
+        parseInt(ssmText,2);
+
+
+    /*
+        Convert logical ARINC label into
+        its transmitted bit representation.
+    */
+
+    const wireLabel =
+        reverse8(label);
+
+
+    /*
+        Construct bits 1 through 31.
+    */
+
+    let word = 0;
+
+
+    word |= wireLabel;
+
+    word |=
+        (sdi << 8);
+
+    word |=
+        (data << 10);
+
+    word |=
+        (ssm << 29);
+
+
+    /* PARITY */
+
+    let parity;
+
+
+    if(paritySetting === "auto") {
+
+        let ones = 0;
+
+
+        for(let bit = 0; bit < 31; bit++) {
+
+            if(
+                (word >>> bit) & 1
+            ) {
+                ones++;
+            }
+        }
+
+
+        /*
+            Force total word to odd parity.
+        */
+
+        parity =
+            (ones % 2 === 0)
+            ? 1
+            : 0;
+
+    } else {
+
+        parity =
+            parseInt(
+                paritySetting,
+                10
+            );
+    }
+
+
+    if(parity === 1) {
+
+        word =
+            (
+                word |
+                0x80000000
+            ) >>> 0;
+    }
+
+
+    currentWord =
+        word >>> 0;
+
+
+    /*
+        Complete-word input stays synchronized.
+    */
+
+    document
+        .getElementById("wordInput")
+        .value =
+            currentWord
+                .toString(16)
+                .toUpperCase()
+                .padStart(8,"0");
+
+
+    document
+        .getElementById("inputFormat")
+        .value = "hex";
+
+
+    document
+        .getElementById("labelMode")
+        .value = "bus";
+
+
+    updateDisplay();
+}
+
+
+/* =========================================================
+   UPDATE EVERYTHING
+========================================================= */
+
+function updateDisplay() {
+
+    const hex =
+        currentWord
+            .toString(16)
+            .toUpperCase()
+            .padStart(8,"0");
+
+
+    const binary =
+        currentWord
+            .toString(2)
+            .padStart(32,"0");
+
+
+    document
+        .getElementById("hexWord")
+        .textContent =
+            "0x" + hex;
+
+
+    document
+        .getElementById("binaryWord")
+        .textContent =
+            binary
+                .match(/.{1,4}/g)
+                .join(" ");
+
+
+    /* LABEL */
+
+    const rawLabel =
+        currentWord & 0xFF;
+
+
+    const labelMode =
+        document
+            .getElementById("labelMode")
+            .value;
+
+
+    let label;
+
+
+    if(labelMode === "bus") {
+
+        label =
+            reverse8(rawLabel);
+
+    } else {
+
+        label =
+            rawLabel;
+    }
+
+
+    document
+        .getElementById("labelOutput")
+        .textContent =
+            label
+                .toString(8)
+                .padStart(3,"0")
+            + " oct";
+
+
+    document
+        .getElementById("labelHex")
+        .textContent =
+            "0x" +
+            label
+                .toString(16)
+                .toUpperCase()
+                .padStart(2,"0");
+
+
+    /* SDI */
+
+    const sdi =
+        extractBits(10,9);
+
+
+    document
+        .getElementById("sdiOutput")
+        .textContent =
+            sdi
+                .toString(2)
+                .padStart(2,"0");
+
+
+    /* DATA */
+
+    const data =
+        extractBits(29,11);
+
+
+    document
+        .getElementById("dataOutput")
+        .textContent =
+            "0x" +
+            data
+                .toString(16)
+                .toUpperCase()
+                .padStart(5,"0");
+
+
+    /* SSM */
+
+    const ssm =
+        extractBits(31,30);
+
+
+    document
+        .getElementById("ssmOutput")
+        .textContent =
+            ssm
+                .toString(2)
+                .padStart(2,"0");
+
+
+    /* PARITY BIT */
+
+    const parityBit =
+        getBit(32);
+
+
+    document
+        .getElementById("parityBitOutput")
+        .textContent =
+            parityBit;
+
+
+    /* PARITY VALIDATION */
+
+    let ones = 0;
+
+
+    for(let bit = 1; bit <= 32; bit++) {
+
+        ones +=
+            getBit(bit);
+    }
+
+
+    const validParity =
+        ones % 2 === 1;
+
+
+    const parityOutput =
+        document
+            .getElementById("parityOutput");
+
+
+    parityOutput.textContent =
+        validParity
+        ? "Odd / Valid ✓"
+        : "Invalid ✗";
+
+
+    parityOutput.className =
+        "value " +
+        (
+            validParity
+            ? "good"
+            : "bad"
+        );
+
+
+    /*
+        Keep editable field inputs synchronized
+        with the word.
+
+        Parity changes to manual representation
+        because the current word may intentionally
+        contain invalid parity.
+    */
+
+    document
+        .getElementById("fieldLabel")
+        .value =
+            label
+                .toString(8)
+                .padStart(3,"0");
+
+
+    document
+        .getElementById("fieldSDI")
+        .value =
+            sdi
+                .toString(2)
+                .padStart(2,"0");
+
+
+    document
+        .getElementById("fieldData")
+        .value =
+            data
+                .toString(16)
+                .toUpperCase()
+                .padStart(5,"0");
+
+
+    document
+        .getElementById("fieldSSM")
+        .value =
+            ssm
+                .toString(2)
+                .padStart(2,"0");
+
+
+    /*
+        Complete-word box is also synchronized
+        whenever the map changes.
+    */
+
+    document
+        .getElementById("wordInput")
+        .value =
+            hex;
+
+
+    /*
+        Refresh all dependent displays.
+    */
+
+    drawBits();
+
+    drawDiscretes();
+
+    decodeBNR();
+
+    decodeBCD();
+
+    decodeRaw();
+}
+
+
+/* =========================================================
+   CLICKABLE BIT MAP
+========================================================= */
+
+function drawBits() {
+
+    const container =
+        document.getElementById("bits");
+
+
+    container.innerHTML = "";
+
+
+    for(let bit = 32; bit >= 1; bit--) {
+
+        const div =
+            document.createElement("div");
+
+
+        let cls =
+            "bit ";
+
+
+        if(bit === 32) {
+
+            cls += "parity";
+
+        } else if(bit >= 30) {
+
+            cls += "ssm";
+
+        } else if(bit >= 11) {
+
+            cls += "data";
+
+        } else if(bit >= 9) {
+
+            cls += "sdi";
+
+        } else {
+
+            cls += "label";
+        }
+
+
+        if(getBit(bit) === 1) {
+
+            cls += " is-one";
+        }
+
+
+        div.className =
+            cls;
+
+
+        div.title =
+            "ARINC Bit " +
+            bit +
+            " — click to toggle";
+
+
+        div.innerHTML =
+            "<div class='bit-number'>" +
+            bit +
+            "</div>" +
+
+            "<div class='bit-value'>" +
+            getBit(bit) +
+            "</div>";
+
+
+        div.addEventListener(
+            "click",
+            function() {
+
+                toggleBit(bit);
+            }
+        );
+
+
+        container.appendChild(div);
+    }
+}
+
+
+/* =========================================================
+   TOGGLE INDIVIDUAL BIT
+========================================================= */
+
+function toggleBit(bitNumber) {
+
+    /*
+        ARINC bit numbering:
+        bit 1  -> numeric bit 0
+        bit 32 -> numeric bit 31
+    */
+
+    const mask =
+        (
+            Math.pow(
+                2,
+                bitNumber - 1
+            )
+        ) >>> 0;
+
+
+    /*
+        XOR toggles exactly one bit.
+    */
+
+    currentWord =
+        (
+            currentWord ^
+            mask
+        ) >>> 0;
+
+
+    /*
+        IMPORTANT:
+
+        Parity is intentionally NOT automatically
+        corrected here.
+
+        If a data bit is toggled, parity may become
+        invalid. This allows the application to be
+        used for troubleshooting and intentionally
+        malformed ARINC words.
+    */
+
+
+    document
+        .getElementById("inputFormat")
+        .value =
+            "hex";
+
+
+    updateDisplay();
+}
+
+
+/* =========================================================
+   BNR DECODER
+========================================================= */
+
+function decodeBNR() {
+
+    const msb =
+        parseInt(
+            document
+                .getElementById("bnrMSB")
+                .value
+        );
+
+
+    const lsb =
+        parseInt(
+            document
+                .getElementById("bnrLSB")
+                .value
+        );
+
+
+    if(
+        msb < lsb ||
+        lsb < 11 ||
+        msb > 29
+    ) {
+
+        document
+            .getElementById("bnrResult")
+            .textContent =
+                "Invalid bit range";
+
+        return;
+    }
+
+
+    const width =
+        msb - lsb + 1;
+
+
+    const raw =
+        extractBits(
+            msb,
+            lsb
+        );
+
+
+    const signed =
+        document
+            .getElementById("bnrSigned")
+            .value === "yes";
+
+
+    let integer =
+        raw;
+
+
+    if(signed) {
+
+        const signThreshold =
+            Math.pow(
+                2,
+                width - 1
+            );
+
+
+        if(raw >= signThreshold) {
+
+            integer =
+                raw -
+                Math.pow(
+                    2,
+                    width
+                );
+        }
+    }
+
+
+    const resolution =
+        parseFloat(
+            document
+                .getElementById("bnrResolution")
+                .value
+        ) || 0;
+
+
+    const offset =
+        parseFloat(
+            document
+                .getElementById("bnrOffset")
+                .value
+        ) || 0;
+
+
+    const units =
+        document
+            .getElementById("bnrUnits")
+            .value;
+
+
+    const engineering =
+        integer *
+        resolution +
+        offset;
+
+
+    document
+        .getElementById("bnrResult")
+        .textContent =
+            engineering
+                .toLocaleString(
+                    undefined,
+                    {
+                        maximumFractionDigits:12
+                    }
+                )
+            +
+            (
+                units
+                ? " " + units
+                : ""
+            );
+
+
+    document
+        .getElementById("bnrRaw")
+        .textContent =
+            integer;
+
+
+    document
+        .getElementById("bnrBits")
+        .textContent =
+            msb +
+            "–" +
+            lsb;
+
+
+    document
+        .getElementById("bnrBinary")
+        .textContent =
+            binaryRange(
+                msb,
+                lsb
+            );
+}
+
+
+/* =========================================================
+   BCD DECODER
+========================================================= */
+
+function decodeBCD() {
+
+    const definitions = [
+
+        {
+            name:"D1",
+            msb:29,
+            lsb:27
+        },
+
+        {
+            name:"D2",
+            msb:26,
+            lsb:23
+        },
+
+        {
+            name:"D3",
+            msb:22,
+            lsb:19
+        },
+
+        {
+            name:"D4",
+            msb:18,
+            lsb:15
+        },
+
+        {
+            name:"D5",
+            msb:14,
+            lsb:11
+        }
+
+    ];
+
+
+    let number = "";
+
+    let valid = true;
+
+
+    const body =
+        document
+            .getElementById("bcdTable");
+
+
+    body.innerHTML = "";
+
+
+    definitions.forEach(
+        d => {
+
+            const val =
+                extractBits(
+                    d.msb,
+                    d.lsb
+                );
+
+
+            if(val > 9) {
+
+                valid = false;
+            }
+
+
+            number +=
+                val.toString();
+
+
+            const row =
+                document.createElement("tr");
+
+
+            row.innerHTML =
+
+                "<td>" +
+                d.name +
+                "</td>" +
+
+                "<td>" +
+                d.msb +
+                "–" +
+                d.lsb +
+                "</td>" +
+
+                "<td class='mono'>" +
+                binaryRange(
+                    d.msb,
+                    d.lsb
+                ) +
+                "</td>" +
+
+                "<td>" +
+                val +
+                (
+                    val > 9
+                    ? " ⚠"
+                    : ""
+                ) +
+                "</td>";
+
+
+            body.appendChild(row);
+        }
+    );
+
+
+    document
+        .getElementById("bcdResult")
+        .textContent =
+            valid
+            ? number
+            : number +
+              " (invalid BCD digit)";
+}
+
+
+/* =========================================================
+   DISCRETE VIEW
+========================================================= */
+
+function drawDiscretes() {
+
+    const container =
+        document
+            .getElementById("discreteGrid");
+
+
+    container.innerHTML = "";
+
+
+    for(let bit = 29; bit >= 11; bit--) {
+
+        const state =
+            getBit(bit);
+
+
+        const div =
+            document.createElement("div");
+
+
+        div.className =
+            "discrete " +
+            (
+                state
+                ? "on"
+                : "off"
+            );
+
+
+        div.innerHTML =
+            "<strong>Bit " +
+            bit +
+            "</strong><br>" +
+            state;
+
+
+        /*
+            These discrete boxes can also toggle
+            their corresponding data bit.
+        */
+
+        div.style.cursor =
+            "pointer";
+
+
+        div.title =
+            "Click to toggle ARINC bit " +
+            bit;
+
+
+        div.addEventListener(
+            "click",
+            function() {
+
+                toggleBit(bit);
+            }
+        );
+
+
+        container.appendChild(div);
+    }
+}
+
+
+/* =========================================================
+   RAW BIT EXTRACTION
+========================================================= */
+
+function decodeRaw() {
+
+    const msb =
+        parseInt(
+            document
+                .getElementById("rawMSB")
+                .value
+        );
+
+
+    const lsb =
+        parseInt(
+            document
+                .getElementById("rawLSB")
+                .value
+        );
+
+
+    if(
+        msb < lsb ||
+        msb > 32 ||
+        lsb < 1
+    ) {
+
+        document
+            .getElementById("rawBinary")
+            .textContent =
+                "Invalid range";
+
+        return;
+    }
+
+
+    const value =
+        extractBits(
+            msb,
+            lsb
+        );
+
+
+    document
+        .getElementById("rawBinary")
+        .textContent =
+            binaryRange(
+                msb,
+                lsb
+            );
+
+
+    document
+        .getElementById("rawHex")
+        .textContent =
+            "0x" +
+            value
+                .toString(16)
+                .toUpperCase();
+
+
+    document
+        .getElementById("rawDecimal")
+        .textContent =
+            value;
+}
+
+
+/* =========================================================
+   DATA DECODER TABS
+========================================================= */
+
+function setTab(id, button) {
+
+    document
+        .querySelectorAll(".panel")
+        .forEach(
+            panel =>
+                panel.classList.remove("active")
+        );
+
+
+    document
+        .querySelectorAll(".tab")
+        .forEach(
+            tab =>
+                tab.classList.remove("active")
+        );
+
+
+    document
+        .getElementById(id)
+        .classList.add("active");
+
+
+    button
+        .classList
+        .add("active");
+}
+
+
+/* =========================================================
+   ERRORS
+========================================================= */
+
+function showError(message) {
+
+    const error =
+        document
+            .getElementById("error");
+
+
+    error.textContent =
+        message;
+
+
+    error.style.display =
+        "block";
+}
+
+
+function hideError() {
+
+    document
+        .getElementById("error")
+        .style
+        .display =
+            "none";
+}
+
+
+/* =========================================================
+   LIVE EVENT LISTENERS
+========================================================= */
+
+[
+    "bnrMSB",
+    "bnrLSB",
+    "bnrSigned",
+    "bnrResolution",
+    "bnrOffset",
+    "bnrUnits"
+
+].forEach(
+
+    id => {
+
+        document
+            .getElementById(id)
+            .addEventListener(
+                "input",
+                decodeBNR
+            );
+    }
+);
+
+
+document
+    .getElementById("rawMSB")
+    .addEventListener(
+        "input",
+        decodeRaw
+    );
+
+
+document
+    .getElementById("rawLSB")
+    .addEventListener(
+        "input",
+        decodeRaw
+    );
+
+
+document
+    .getElementById("labelMode")
+    .addEventListener(
+        "change",
+        updateDisplay
+    );
+
+
+document
+    .getElementById("wordInput")
+    .addEventListener(
+        "keydown",
+        function(e) {
+
+            if(e.key === "Enter") {
+
+                decodeFullWord();
+            }
+        }
+    );
+
+
+/* =========================================================
+   INITIALIZE
+========================================================= */
+
+decodeFullWord();
+
+</script>
+
+</body>
+</html>
